@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record and Transcribe Audio</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f7f7f7;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .result p {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="mb-4">Record Audio and Get Transcription</h2>
+        <div>
+            <button id="recordButton" class="btn btn-primary">Record</button>
+            <button id="stopButton" class="btn btn-secondary" disabled>Stop</button>
+        </div>
+        <div id="transcription-result" class="result mt-4" style="display: none;">
+            <h5>Transcription:</h5>
+            <p id="transcription-text"></p>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+
+        recordButton.addEventListener('click', async () => {
+            audioChunks = [];
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio_data', audioBlob, 'recorded_audio.wav');
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/transcribe',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        $('#transcription-text').text(response.transcription);
+                        $('#transcription-result').show();
+                    },
+                    error: function() {
+                        $('#transcription-text').text('An error occurred during transcription.');
+                        $('#transcription-result').show();
+                    }
+                });
+            };
+
+            mediaRecorder.start();
+            recordButton.disabled = true;
+            stopButton.disabled = false;
+        });
+
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+        });
+    </script>
+</body>
+</html>
